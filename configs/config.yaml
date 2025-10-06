@@ -1,0 +1,45 @@
+# Base configuration
+app:
+  name: task-queue
+  version: 0.1.0
+
+server:
+  http:
+    host: 0.0.0.0
+    port: 8080
+    read_timeout: 15s
+    write_timeout: 15s
+    shutdown_timeout: 30s
+  grpc:
+    host: 0.0.0.0
+    port: 50051
+
+database:
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: 5m
+  ssl_mode: disable
+
+kafka:
+  topics:
+    tasks_high: tasks-high
+    tasks_normal: tasks-normal
+    tasks_low: tasks-low
+    tasks_retry: tasks-retry
+    tasks_dlq: tasks-dlq
+    task_results: task-results
+
+worker:
+  concurrency: 5
+  max_retries: 3
+  retry_backoff: 5s
+  shutdown_timeout: 30s
+  process_timeout: 5m
+
+metrics:
+  enabled: true
+  path: /metrics
+
+log:
+  add_caller: false
+  stack_trace: false

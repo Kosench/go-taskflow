@@ -1,0 +1,41 @@
+# Development configuration
+app:
+  environment: development
+  debug: true
+
+server:
+  http:
+    port: 8080
+  grpc:
+    port: 50051
+
+database:
+  host: localhost
+  port: 5432
+  name: taskqueue
+  user: taskqueue
+  password: taskqueue
+
+kafka:
+  brokers:
+    - localhost:9092
+  producer:
+    required_acks: 1  # Only wait for leader
+    idempotent: false # Faster for development
+  consumer:
+    group_id: task-workers-dev
+
+worker:
+  concurrency: 2  # Less for local development
+
+metrics:
+  port: 9091  # Different port for development
+
+tracing:
+  enabled: true
+  sample_rate: 1.0  # Sample everything in dev
+
+log:
+  level: debug
+  format: console  # Pretty print for development
+  add_caller: true
