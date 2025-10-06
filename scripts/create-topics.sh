@@ -20,9 +20,15 @@ create_topic() {
     local topic_name=$1
     local partitions=$2
     local replication_factor=$3
-    local configs=$4
+    shift 3  # Remove first 3 arguments, leaving only configs
 
     echo -e "${GREEN}Creating topic: ${topic_name}${NC}"
+
+    # Build config arguments
+    local config_args=""
+    for config in "$@"; do
+        config_args="$config_args --config $config"
+    done
 
     docker exec ${KAFKA_CONTAINER} kafka-topics \
         --create \
@@ -30,7 +36,7 @@ create_topic() {
         --topic ${topic_name} \
         --partitions ${partitions} \
         --replication-factor ${replication_factor} \
-        --config ${configs} \
+        $config_args \
         --if-not-exists
 
     if [ $? -eq 0 ]; then
@@ -40,17 +46,29 @@ create_topic() {
     fi
 }
 
-# Create topics
-create_topic "tasks-high" 3 1 "retention.ms=604800000,compression.type=snappy"
-create_topic "tasks-normal" 3 1 "retention.ms=604800000,compression.type=snappy"
-create_topic "tasks-low" 2 1 "retention.ms=604800000,compression.type=snappy"
-create_topic "tasks-retry" 2 1 "retention.ms=604800000,compression.type=snappy"
-create_topic "tasks-dlq" 1 1 "retention.ms=2592000000,compression.type=gzip"
-create_topic "task-results" 3 1 "retention.ms=604800000,compression.type=snappy,cleanup.policy=compact"
+# Create topics with proper config format
+create_topic "tasks-high" 3 1 "retention.ms=604800000" "compression.type=snappy"
+create_topic "tasks-normal" 3 1 "retention.ms=604800000" "compression.type=snappy"
+create_topic "tasks-low" 2 1 "retention.ms=604800000" "compression.type=snappy"
+create_topic "tasks-retry" 2 1 "retention.ms=604800000" "compression.type=snappy"
+create_topic "tasks-dlq" 1 1 "retention.ms=2592000000" "compression.type=gzip"
+create_topic "task-results" 3 1 "retention.ms=604800000" "compression.type=snappy" "cleanup.policy=compact"
 
+echo ""
 echo -e "${GREEN}Listing all topics:${NC}"
 docker exec ${KAFKA_CONTAINER} kafka-topics \
     --list \
     --bootstrap-server ${KAFKA_BOOTSTRAP_SERVER}
 
+echo ""
+echo -e "${GREEN}Topic details:${NC}"
+for topic in tasks-high tasks-normal tasks-low tasks-retry tasks-dlq task-results; do
+    echo -e "${YELLOW}Topic: $topic${NC}"
+    docker exec ${KAFKA_CONTAINER} kafka-topics \
+        --describe \
+        --topic $topic \
+        --bootstrap-server ${KAFKA_BOOTSTRAP_SERVER} 2>/dev/null | head -n 1
+done
+
+echo ""
 echo -e "${GREEN}✓ All topics created!${NC}"
