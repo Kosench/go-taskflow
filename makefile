@@ -151,6 +151,31 @@ infra-clean: ## Clean infrastructure (WARNING: deletes data)
 kafka-topics: ## Create Kafka topics
 	@./scripts/create-topics.sh
 
+.PHONY: migrate-up
+migrate-up: ## Run database migrations up
+	@echo "$(GREEN)Running migrations up...$(NC)"
+	@go run ./cmd/migrator -command=up
+
+.PHONY: migrate-down
+migrate-down: ## Run database migrations down
+	@echo "$(YELLOW)Running migrations down...$(NC)"
+	@go run ./cmd/migrator -command=down
+
+.PHONY: migrate-drop
+migrate-drop: ## Drop all migrations (DANGER!)
+	@echo "$(RED)Dropping all migrations...$(NC)"
+	@go run ./cmd/migrator -command=drop
+
+.PHONY: migrate-version
+migrate-version: ## Show current migration version
+	@echo "$(GREEN)Current migration version:$(NC)"
+	@go run ./cmd/migrator -command=version
+
+.PHONY: migrate-create
+migrate-create: ## Create a new migration (usage: make migrate-create name=migration_name)
+	@echo "$(GREEN)Creating migration: $(name)$(NC)"
+	@migrate create -ext sql -dir migrations -seq $(name)
+
 .PHONY: all
 all: clean build test ## Clean, build and test
 

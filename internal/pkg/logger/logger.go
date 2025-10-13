@@ -33,7 +33,6 @@ var (
 // New creates a new logger instance
 func New(cfg Config) *Logger {
 	var output io.Writer
-
 	// Setup output
 	switch strings.ToLower(cfg.Output) {
 	case "stderr":
