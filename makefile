@@ -115,6 +115,11 @@ migrate-version: ## Show current migration version
 	@echo "$(GREEN)Current migration version:$(NC)"
 	@go run ./cmd/migrator -command=version
 
+.PHONY: migrate-force
+migrate-force: ## Force migration to specific version (usage: make migrate-force version=1)
+	@echo "$(YELLOW)Forcing migration to version $(version)...$(NC)"
+	@go run ./cmd/migrator -command=force -force=$(version)
+
 .PHONY: migrate-create
 migrate-create: ## Create a new migration (usage: make migrate-create name=migration_name)
 	@echo "$(GREEN)Creating migration: $(name)$(NC)"

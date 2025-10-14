@@ -3,12 +3,14 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
+
 	"github.com/Kosench/go-taskflow/internal/pkg/config"
 	"github.com/Kosench/go-taskflow/internal/pkg/database"
 	"github.com/Kosench/go-taskflow/internal/pkg/logger"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
-	"os"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
 func main() {
@@ -17,6 +19,7 @@ func main() {
 		steps   = flag.Int("steps", 0, "Number of migrations to execute (used with steps command)")
 		force   = flag.Int("force", 0, "Force migration version (used with force command)")
 	)
+	flag.Parse()
 
 	cfg := config.MustLoad("")
 
