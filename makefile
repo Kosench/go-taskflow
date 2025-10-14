@@ -97,13 +97,28 @@ proto: ## Generate protobuf code
 
 .PHONY: migrate-up
 migrate-up: ## Run database migrations up
-	@echo "$(GREEN)Running migrations...$(NC)"
-	@$(GO) run ./cmd/migrator up
+	@echo "$(GREEN)Running migrations up...$(NC)"
+	@go run ./cmd/migrator -command=up
 
 .PHONY: migrate-down
 migrate-down: ## Run database migrations down
-	@echo "$(YELLOW)Rolling back migrations...$(NC)"
-	@$(GO) run ./cmd/migrator down
+	@echo "$(YELLOW)Running migrations down...$(NC)"
+	@go run ./cmd/migrator -command=down
+
+.PHONY: migrate-drop
+migrate-drop: ## Drop all migrations (DANGER!)
+	@echo "$(RED)Dropping all migrations...$(NC)"
+	@go run ./cmd/migrator -command=drop
+
+.PHONY: migrate-version
+migrate-version: ## Show current migration version
+	@echo "$(GREEN)Current migration version:$(NC)"
+	@go run ./cmd/migrator -command=version
+
+.PHONY: migrate-force
+migrate-force: ## Force migration to specific version (usage: make migrate-force version=1)
+	@echo "$(YELLOW)Forcing migration to version $(version)...$(NC)"
+	@go run ./cmd/migrator -command=force -force=$(version)
 
 .PHONY: migrate-create
 migrate-create: ## Create a new migration (usage: make migrate-create name=migration_name)
