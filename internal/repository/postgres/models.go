@@ -3,9 +3,10 @@ package postgres
 import (
 	"database/sql"
 	"database/sql/driver"
+	"time"
+
 	"github.com/Kosench/go-taskflow/internal/domain"
 	"github.com/Kosench/go-taskflow/internal/pkg/database"
-	"time"
 )
 
 // JSONB represents a PostgreSQL JSONB column
