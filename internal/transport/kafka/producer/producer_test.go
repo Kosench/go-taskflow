@@ -1,4 +1,4 @@
-package kafka
+package producer
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"github.com/Kosench/go-taskflow/internal/domain"
 	"github.com/Kosench/go-taskflow/internal/pkg/config"
 	"github.com/Kosench/go-taskflow/internal/pkg/logger"
+	"github.com/Kosench/go-taskflow/internal/transport/kafka/messages"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -88,7 +89,7 @@ func TestProducer_prepareTaskMessage(t *testing.T) {
 
 func TestTaskMessage_Marshal(t *testing.T) {
 	now := time.Now()
-	msg := TaskMessage{
+	msg := messages.TaskMessage{
 		ID:         "test-123",
 		Type:       "image_resize",
 		Priority:   1,
@@ -102,7 +103,7 @@ func TestTaskMessage_Marshal(t *testing.T) {
 	data, err := json.Marshal(msg)
 	require.NoError(t, err)
 
-	var decoded TaskMessage
+	var decoded messages.TaskMessage
 	err = json.Unmarshal(data, &decoded)
 	require.NoError(t, err)
 

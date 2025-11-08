@@ -1,11 +1,14 @@
-package kafka
+package consumer
 
 import (
 	"context"
 	"fmt"
+
 	"github.com/Kosench/go-taskflow/internal/domain"
 	"github.com/Kosench/go-taskflow/internal/pkg/config"
 	"github.com/Kosench/go-taskflow/internal/pkg/logger"
+	"github.com/Kosench/go-taskflow/internal/transport/kafka/converter"
+	"github.com/Kosench/go-taskflow/internal/transport/kafka/messages"
 )
 
 type TaskHandler interface {
@@ -20,19 +23,19 @@ func (f TaskHandlerFunc) HandleTask(ctx context.Context, task *domain.Task) erro
 
 type TaskConsumer struct {
 	consumer  *Consumer
-	converter *TaskConverter
+	converter *converter.TaskConverter
 	handler   TaskHandler
 	logger    *logger.Logger
 }
 
 func NewTaskConsumer(cfg *config.KafkaConfig, handler TaskHandler, log *logger.Logger) (*TaskConsumer, error) {
 	tc := &TaskConsumer{
-		converter: NewTaskConverter(),
+		converter: converter.NewTaskConverter(),
 		handler:   handler,
 		logger:    log,
 	}
 
-	msgHandler := MessageHandlerFunc(func(ctx context.Context, msg *TaskMessage) error {
+	msgHandler := MessageHandlerFunc(func(ctx context.Context, msg *messages.TaskMessage) error {
 		return tc.handleMessage(ctx, msg)
 	})
 
@@ -43,7 +46,6 @@ func NewTaskConsumer(cfg *config.KafkaConfig, handler TaskHandler, log *logger.L
 
 	tc.consumer = consumer
 	return tc, err
-
 }
 
 func (tc *TaskConsumer) Start(ctx context.Context) error {
@@ -54,7 +56,7 @@ func (tc *TaskConsumer) Stop() error {
 	return tc.consumer.Stop()
 }
 
-func (tc *TaskConsumer) handleMessage(ctx context.Context, msg *TaskMessage) error {
+func (tc *TaskConsumer) handleMessage(ctx context.Context, msg *messages.TaskMessage) error {
 	task, err := tc.converter.ToDomainTask(msg)
 	if err != nil {
 		tc.logger.Error().

@@ -1,4 +1,4 @@
-package kafka
+package consumer
 
 import (
 	"context"
@@ -10,6 +10,8 @@ import (
 	"github.com/IBM/sarama"
 	"github.com/Kosench/go-taskflow/internal/pkg/config"
 	"github.com/Kosench/go-taskflow/internal/pkg/logger"
+	kafkaconfig "github.com/Kosench/go-taskflow/internal/transport/kafka/config"
+	"github.com/Kosench/go-taskflow/internal/transport/kafka/messages"
 )
 
 // Consumer represents Kafka consumer
@@ -35,19 +37,19 @@ type Consumer struct {
 
 // MessageHandler is the interface for handling messages
 type MessageHandler interface {
-	HandleMessage(ctx context.Context, msg *TaskMessage) error
+	HandleMessage(ctx context.Context, msg *messages.TaskMessage) error
 }
 
 // MessageHandlerFunc is a function adapter for MessageHandler
-type MessageHandlerFunc func(ctx context.Context, msg *TaskMessage) error
+type MessageHandlerFunc func(ctx context.Context, msg *messages.TaskMessage) error
 
-func (f MessageHandlerFunc) HandleMessage(ctx context.Context, msg *TaskMessage) error {
+func (f MessageHandlerFunc) HandleMessage(ctx context.Context, msg *messages.TaskMessage) error {
 	return f(ctx, msg)
 }
 
 // NewConsumer creates new Kafka consumer
 func NewConsumer(cfg *config.KafkaConfig, handler MessageHandler, log *logger.Logger) (*Consumer, error) {
-	saramaConfig := BuildConsumerConfig(&cfg.Consumer)
+	saramaConfig := kafkaconfig.BuildConsumerConfig(&cfg.Consumer)
 
 	// Create consumer group
 	consumerGroup, err := sarama.NewConsumerGroup(cfg.Brokers, cfg.Consumer.GroupID, saramaConfig)
@@ -219,13 +221,13 @@ func (h *consumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupSession,
 // processMessage processes a single message
 func (h *consumerGroupHandler) processMessage(ctx context.Context, message *sarama.ConsumerMessage) error {
 	// Parse message
-	var taskMsg TaskMessage
+	var taskMsg messages.TaskMessage
 	if err := json.Unmarshal(message.Value, &taskMsg); err != nil {
 		return fmt.Errorf("failed to unmarshal message: %w", err)
 	}
 
 	// Add metadata from Kafka to context
-	headers := ParseHeaders(message.Headers)
+	headers := messages.ParseHeaders(message.Headers)
 	ctx = context.WithValue(ctx, "kafka_topic", message.Topic)
 	ctx = context.WithValue(ctx, "kafka_partition", message.Partition)
 	ctx = context.WithValue(ctx, "kafka_offset", message.Offset)

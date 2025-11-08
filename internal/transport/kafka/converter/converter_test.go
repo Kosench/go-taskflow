@@ -1,13 +1,15 @@
-package kafka
+package converter
 
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/Kosench/go-taskflow/internal/domain"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
+
+	"github.com/Kosench/go-taskflow/internal/domain"
+	"github.com/Kosench/go-taskflow/internal/transport/kafka/messages"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTaskConverter_ToKafkaMessage(t *testing.T) {
@@ -40,7 +42,7 @@ func TestTaskConverter_ToDomainTask(t *testing.T) {
 	converter := NewTaskConverter()
 
 	now := time.Now()
-	msg := &TaskMessage{
+	msg := &messages.TaskMessage{
 		ID:         "test-123",
 		Type:       "send_email",
 		Priority:   1,
@@ -67,7 +69,7 @@ func TestTaskConverter_ToDomainTask(t *testing.T) {
 func TestTaskConverter_InvalidTaskType(t *testing.T) {
 	converter := NewTaskConverter()
 
-	msg := &TaskMessage{
+	msg := &messages.TaskMessage{
 		ID:       "test-123",
 		Type:     "invalid_type",
 		Priority: 1,
