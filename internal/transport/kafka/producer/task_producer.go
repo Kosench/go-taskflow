@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/IBM/sarama"
 	"github.com/Kosench/go-taskflow/internal/domain"
@@ -240,6 +241,10 @@ func (tp *TaskProducer) createHeaders(task *domain.Task) []sarama.RecordHeader {
 	return headers
 }
 
+// CreateResultMessage creates a result message from the task
+func (tp *TaskProducer) CreateResultMessage(task *domain.Task, workerID string, duration time.Duration) *messages.TaskResultMessage {
+	return tp.converter.ToResultMessage(task, workerID, duration)
+}
 func (tp *TaskProducer) Close() error {
 	return tp.producer.Close()
 }
