@@ -18,6 +18,8 @@ type TaskRepository interface {
 	// Update updates an existing task
 	Update(ctx context.Context, task *domain.Task) error
 
+	UpdateForRetry(ctx context.Context, task *domain.Task) error
+
 	// Delete deletes a task by ID
 	Delete(ctx context.Context, id string) error
 
