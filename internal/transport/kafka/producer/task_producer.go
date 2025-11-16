@@ -1,18 +1,22 @@
-package kafka
+package producer
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
+
 	"github.com/IBM/sarama"
 	"github.com/Kosench/go-taskflow/internal/domain"
 	"github.com/Kosench/go-taskflow/internal/pkg/config"
 	"github.com/Kosench/go-taskflow/internal/pkg/logger"
+	"github.com/Kosench/go-taskflow/internal/transport/kafka/converter"
+	"github.com/Kosench/go-taskflow/internal/transport/kafka/messages"
 )
 
 type TaskProducer struct {
 	producer  *Producer
-	converter *TaskConverter
+	converter *converter.TaskConverter
 	config    *config.KafkaConfig
 	logger    *logger.Logger
 }
@@ -25,7 +29,7 @@ func NewTaskProducer(cfg *config.KafkaConfig, log *logger.Logger) (*TaskProducer
 
 	return &TaskProducer{
 		producer:  producer,
-		converter: NewTaskConverter(),
+		converter: converter.NewTaskConverter(),
 		config:    cfg,
 		logger:    log,
 	}, nil
@@ -67,7 +71,7 @@ func (tp *TaskProducer) PublishTask(ctx context.Context, task *domain.Task) erro
 }
 
 // PublishTaskResult publishes task processing result
-func (tp *TaskProducer) PublishTaskResult(ctx context.Context, result *TaskResultMessage) error {
+func (tp *TaskProducer) PublishTaskResult(ctx context.Context, result *messages.TaskResultMessage) error {
 	// Marshal to JSON
 	value, err := json.Marshal(result)
 	if err != nil {
@@ -237,6 +241,10 @@ func (tp *TaskProducer) createHeaders(task *domain.Task) []sarama.RecordHeader {
 	return headers
 }
 
+// CreateResultMessage creates a result message from the task
+func (tp *TaskProducer) CreateResultMessage(task *domain.Task, workerID string, duration time.Duration) *messages.TaskResultMessage {
+	return tp.converter.ToResultMessage(task, workerID, duration)
+}
 func (tp *TaskProducer) Close() error {
 	return tp.producer.Close()
 }

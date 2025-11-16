@@ -1,4 +1,4 @@
-package kafka
+package messages
 
 import (
 	"encoding/json"

@@ -137,6 +137,51 @@ func (r *TaskRepository) Update(ctx context.Context, task *domain.Task) error {
 	return nil
 }
 
+func (r *TaskRepository) UpdateForRetry(ctx context.Context, task *domain.Task) error {
+	query := `
+        UPDATE tasks
+        SET status = $2,
+            retries = $3,
+            worker_id = NULL,
+            started_at = NULL,
+            error = NULL,
+            result = NULL,
+            scheduled_at = $4,
+            updated_at = $5
+        WHERE id = $1
+          AND status = 'failed'
+          AND retries < max_retries
+    `
+
+	result, err := r.db.ExecContext(ctx, query,
+		task.ID,
+		task.Status,
+		task.Retries,
+		task.ScheduledAt,
+		task.UpdatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update task for retry: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("task cannot be retried: wrong status or max retries reached")
+	}
+
+	logger.Get().Debug().
+		Str("task_id", task.ID).
+		Int("retry_attempt", task.Retries).
+		Time("scheduled_at", *task.ScheduledAt).
+		Msg("task updated for retry")
+
+	return nil
+}
+
 // Delete deletes a task by ID
 func (r *TaskRepository) Delete(ctx context.Context, id string) error {
 	query := `DELETE FROM tasks WHERE id = $1`

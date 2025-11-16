@@ -1,17 +1,20 @@
-package kafka
+package consumer
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"testing"
+	"time"
+
 	"github.com/IBM/sarama"
 	"github.com/Kosench/go-taskflow/internal/pkg/config"
 	"github.com/Kosench/go-taskflow/internal/pkg/logger"
+	"github.com/Kosench/go-taskflow/internal/transport/kafka/messages"
+	"github.com/Kosench/go-taskflow/internal/transport/kafka/producer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"testing"
-	"time"
 )
 
 // MockMessageHandler for testing
@@ -19,7 +22,7 @@ type MockMessageHandler struct {
 	mock.Mock
 }
 
-func (m *MockMessageHandler) HandleMessage(ctx context.Context, msg *TaskMessage) error {
+func (m *MockMessageHandler) HandleMessage(ctx context.Context, msg *messages.TaskMessage) error {
 	args := m.Called(ctx, msg)
 	return args.Error(0)
 }
@@ -28,17 +31,17 @@ func TestConsumerGroupHandler_processMessage(t *testing.T) {
 	mockHandler := new(MockMessageHandler)
 	log := logger.New(logger.Config{Level: "debug"})
 
-	consumer := &Consumer{
+	c := &Consumer{
 		handler: mockHandler,
 		logger:  log,
 	}
 
 	handler := &consumerGroupHandler{
-		consumer: consumer,
+		consumer: c,
 	}
 
 	// Create test message
-	taskMsg := TaskMessage{
+	taskMsg := messages.TaskMessage{
 		ID:       "test-123",
 		Type:     "test_task",
 		Priority: 1,
@@ -70,10 +73,10 @@ func TestConsumerGroupHandler_processMessage(t *testing.T) {
 }
 
 func TestBatchConsumer_HandleMessage(t *testing.T) {
-	processedBatches := make(chan []*TaskMessage, 10)
+	processedBatches := make(chan []*messages.TaskMessage, 10)
 
-	handler := BatchMessageHandlerFunc(func(ctx context.Context, messages []*TaskMessage) error {
-		processedBatches <- messages
+	handler := BatchMessageHandlerFunc(func(ctx context.Context, msgs []*messages.TaskMessage) error {
+		processedBatches <- msgs
 		return nil
 	})
 
@@ -84,7 +87,7 @@ func TestBatchConsumer_HandleMessage(t *testing.T) {
 		timeout:   100 * time.Millisecond,
 		handler:   handler,
 		logger:    log,
-		batch:     make([]*TaskMessage, 0, 3),
+		batch:     make([]*messages.TaskMessage, 0, 3),
 		ticker:    time.NewTicker(100 * time.Millisecond),
 		done:      make(chan struct{}),
 	}
@@ -93,7 +96,7 @@ func TestBatchConsumer_HandleMessage(t *testing.T) {
 
 	// Add messages to batch
 	for i := 0; i < 3; i++ {
-		msg := &TaskMessage{
+		msg := &messages.TaskMessage{
 			ID:   fmt.Sprintf("test-%d", i),
 			Type: "test",
 		}
@@ -112,10 +115,10 @@ func TestBatchConsumer_HandleMessage(t *testing.T) {
 }
 
 func TestBatchConsumer_Timeout(t *testing.T) {
-	processedBatches := make(chan []*TaskMessage, 10)
+	processedBatches := make(chan []*messages.TaskMessage, 10)
 
-	handler := BatchMessageHandlerFunc(func(ctx context.Context, messages []*TaskMessage) error {
-		processedBatches <- messages
+	handler := BatchMessageHandlerFunc(func(ctx context.Context, msgs []*messages.TaskMessage) error {
+		processedBatches <- msgs
 		return nil
 	})
 
@@ -126,7 +129,7 @@ func TestBatchConsumer_Timeout(t *testing.T) {
 		timeout:   200 * time.Millisecond,
 		handler:   handler,
 		logger:    log,
-		batch:     make([]*TaskMessage, 0, 10),
+		batch:     make([]*messages.TaskMessage, 0, 10),
 		ticker:    time.NewTicker(200 * time.Millisecond),
 		done:      make(chan struct{}),
 	}
@@ -139,7 +142,7 @@ func TestBatchConsumer_Timeout(t *testing.T) {
 
 	// Add only 2 messages (less than batch size)
 	for i := 0; i < 2; i++ {
-		msg := &TaskMessage{
+		msg := &messages.TaskMessage{
 			ID:   fmt.Sprintf("timeout-%d", i),
 			Type: "test",
 		}
@@ -163,9 +166,9 @@ func TestConsumer_Integration(t *testing.T) {
 		t.Skip("skipping integration test")
 	}
 
-	receivedMessages := make(chan *TaskMessage, 10)
+	receivedMessages := make(chan *messages.TaskMessage, 10)
 
-	handler := MessageHandlerFunc(func(ctx context.Context, msg *TaskMessage) error {
+	handler := MessageHandlerFunc(func(ctx context.Context, msg *messages.TaskMessage) error {
 		receivedMessages <- msg
 		return nil
 	})
@@ -190,18 +193,18 @@ func TestConsumer_Integration(t *testing.T) {
 
 	log := logger.New(logger.Config{Level: "debug"})
 
-	consumer, err := NewConsumer(cfg, handler, log)
+	c, err := NewConsumer(cfg, handler, log)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	// Start consumer
-	err = consumer.Start(ctx)
+	err = c.Start(ctx)
 	require.NoError(t, err)
 
 	// Create producer to send test message
-	producer, err := NewProducer(cfg, log)
+	producer, err := producer.NewProducer(cfg, log)
 	require.NoError(t, err)
 	defer producer.Close()
 
@@ -214,6 +217,6 @@ func TestConsumer_Integration(t *testing.T) {
 	}
 
 	// Stop consumer
-	err = consumer.Stop()
+	err = c.Stop()
 	assert.NoError(t, err)
 }

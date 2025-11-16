@@ -1,14 +1,15 @@
-package kafka
+package consumer
 
 import (
 	"context"
-	"github.com/Kosench/go-taskflow/internal/pkg/config"
-	"github.com/Kosench/go-taskflow/internal/pkg/logger"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/Kosench/go-taskflow/internal/pkg/config"
+	"github.com/Kosench/go-taskflow/internal/pkg/logger"
 )
 
 type GracefulConsumer struct {
@@ -45,6 +46,7 @@ func NewGracefulConsumer(
 
 	return gc, nil
 }
+
 func (gc *GracefulConsumer) Run(ctx context.Context) error {
 	if err := gc.consumer.Start(ctx); err != nil {
 		return err

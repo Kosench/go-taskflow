@@ -1,11 +1,13 @@
-package kafka
+package converter
 
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/Kosench/go-taskflow/internal/domain"
-	"github.com/google/uuid"
 	"time"
+
+	"github.com/Kosench/go-taskflow/internal/domain"
+	"github.com/Kosench/go-taskflow/internal/transport/kafka/messages"
+	"github.com/google/uuid"
 )
 
 type TaskConverter struct{}
@@ -14,12 +16,12 @@ func NewTaskConverter() *TaskConverter {
 	return &TaskConverter{}
 }
 
-func (c *TaskConverter) ToKafkaMessage(task *domain.Task) (*TaskMessage, error) {
+func (c *TaskConverter) ToKafkaMessage(task *domain.Task) (*messages.TaskMessage, error) {
 	if task == nil {
 		return nil, fmt.Errorf("task is nil")
 	}
 
-	msg := &TaskMessage{
+	msg := &messages.TaskMessage{
 		ID:          task.ID,
 		Type:        string(task.Type),
 		Priority:    int(task.Priority),
@@ -43,7 +45,7 @@ func (c *TaskConverter) ToKafkaMessage(task *domain.Task) (*TaskMessage, error) 
 	return msg, nil
 }
 
-func (c *TaskConverter) ToDomainTask(msg *TaskMessage) (*domain.Task, error) {
+func (c *TaskConverter) ToDomainTask(msg *messages.TaskMessage) (*domain.Task, error) {
 	if msg == nil {
 		return nil, fmt.Errorf("message is nil")
 	}
@@ -76,8 +78,8 @@ func (c *TaskConverter) ToDomainTask(msg *TaskMessage) (*domain.Task, error) {
 	return task, nil
 }
 
-func (c *TaskConverter) ToResultMessage(task *domain.Task, workerID string, duration time.Duration) *TaskResultMessage {
-	msg := &TaskResultMessage{
+func (c *TaskConverter) ToResultMessage(task *domain.Task, workerID string, duration time.Duration) *messages.TaskResultMessage {
+	msg := &messages.TaskResultMessage{
 		TaskID:      task.ID,
 		Status:      string(task.Status),
 		WorkerID:    workerID,
@@ -97,10 +99,10 @@ func (c *TaskConverter) ToResultMessage(task *domain.Task, workerID string, dura
 }
 
 // ToRetryMessage creates retry message
-func (c *TaskConverter) ToRetryMessage(task *domain.Task, err error) *RetryMessage {
+func (c *TaskConverter) ToRetryMessage(task *domain.Task, err error) *messages.RetryMessage {
 	nextRetryAt := time.Now().Add(calculateBackoff(task.Retries))
 
-	return &RetryMessage{
+	return &messages.RetryMessage{
 		TaskID:      task.ID,
 		Attempt:     task.Retries,
 		MaxAttempts: task.MaxRetries,
@@ -110,8 +112,8 @@ func (c *TaskConverter) ToRetryMessage(task *domain.Task, err error) *RetryMessa
 }
 
 // ToDLQMessage creates DLQ message
-func (c *TaskConverter) ToDLQMessage(task *domain.Task, originalTopic string, err error) *DLQMessage {
-	return &DLQMessage{
+func (c *TaskConverter) ToDLQMessage(task *domain.Task, originalTopic string, err error) *messages.DLQMessage {
+	return &messages.DLQMessage{
 		TaskID:        task.ID,
 		Type:          string(task.Type),
 		Payload:       json.RawMessage(task.Payload),
@@ -138,3 +140,5 @@ func calculateBackoff(retries int) time.Duration {
 
 	return backoff
 }
+
+

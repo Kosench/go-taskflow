@@ -3,6 +3,7 @@ package postgres
 import (
 	"database/sql"
 	"database/sql/driver"
+	"fmt"
 	"time"
 
 	"github.com/Kosench/go-taskflow/internal/domain"
@@ -25,7 +26,7 @@ func (j *JSONB) Scan(value interface{}) error {
 	case string:
 		*j = []byte(v)
 	default:
-		return nil
+		return fmt.Errorf("cannot scan type %T into JSONB", value)
 	}
 	return nil
 }

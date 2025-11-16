@@ -1,4 +1,4 @@
-package kafka
+package producer
 
 import (
 	"context"
@@ -11,6 +11,8 @@ import (
 	"github.com/Kosench/go-taskflow/internal/domain"
 	"github.com/Kosench/go-taskflow/internal/pkg/config"
 	"github.com/Kosench/go-taskflow/internal/pkg/logger"
+	kafkaconfig "github.com/Kosench/go-taskflow/internal/transport/kafka/config"
+	"github.com/Kosench/go-taskflow/internal/transport/kafka/messages"
 	"github.com/google/uuid"
 )
 
@@ -30,7 +32,7 @@ type Producer struct {
 }
 
 func NewProducer(cfg *config.KafkaConfig, log *logger.Logger) (*Producer, error) {
-	saramaConfig := BuildProducerConfig(&cfg.Producer)
+	saramaConfig := kafkaconfig.BuildProducerConfig(&cfg.Producer)
 
 	producer, err := sarama.NewAsyncProducer(cfg.Brokers, saramaConfig)
 	if err != nil {
@@ -111,7 +113,7 @@ func (p *Producer) SendBatch(ctx context.Context, tasks []*domain.Task) error {
 }
 
 func (p *Producer) prepareTaskMessage(task *domain.Task, topic string) (*sarama.ProducerMessage, error) {
-	payload := TaskMessage{
+	payload := messages.TaskMessage{
 		ID:          task.ID,
 		Type:        string(task.Type),
 		Priority:    int(task.Priority),

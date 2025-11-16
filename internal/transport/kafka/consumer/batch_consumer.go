@@ -1,11 +1,13 @@
-package kafka
+package consumer
 
 import (
 	"context"
-	"github.com/Kosench/go-taskflow/internal/pkg/config"
-	"github.com/Kosench/go-taskflow/internal/pkg/logger"
 	"sync"
 	"time"
+
+	"github.com/Kosench/go-taskflow/internal/pkg/config"
+	"github.com/Kosench/go-taskflow/internal/pkg/logger"
+	"github.com/Kosench/go-taskflow/internal/transport/kafka/messages"
 )
 
 type BatchConsumer struct {
@@ -16,7 +18,7 @@ type BatchConsumer struct {
 	logger    *logger.Logger
 
 	// Batch buffer
-	batch      []*TaskMessage
+	batch      []*messages.TaskMessage
 	batchMutex sync.Mutex
 
 	// Control
@@ -26,13 +28,13 @@ type BatchConsumer struct {
 
 // BatchMessageHandler handles batches of messages
 type BatchMessageHandler interface {
-	HandleBatch(ctx context.Context, messages []*TaskMessage) error
+	HandleBatch(ctx context.Context, messages []*messages.TaskMessage) error
 }
 
 // BatchMessageHandlerFunc is a function adapter for BatchMessageHandler
-type BatchMessageHandlerFunc func(ctx context.Context, messages []*TaskMessage) error
+type BatchMessageHandlerFunc func(ctx context.Context, messages []*messages.TaskMessage) error
 
-func (f BatchMessageHandlerFunc) HandleBatch(ctx context.Context, messages []*TaskMessage) error {
+func (f BatchMessageHandlerFunc) HandleBatch(ctx context.Context, messages []*messages.TaskMessage) error {
 	return f(ctx, messages)
 }
 
@@ -50,7 +52,7 @@ func NewBatchConsumer(
 		timeout:   timeout,
 		handler:   handler,
 		logger:    log,
-		batch:     make([]*TaskMessage, 0, batchSize),
+		batch:     make([]*messages.TaskMessage, 0, batchSize),
 		ticker:    time.NewTicker(timeout),
 		done:      make(chan struct{}),
 	}
@@ -99,7 +101,7 @@ func (bc *BatchConsumer) Stop() error {
 }
 
 // handleMessage adds message to batch
-func (bc *BatchConsumer) handleMessage(ctx context.Context, msg *TaskMessage) error {
+func (bc *BatchConsumer) handleMessage(ctx context.Context, msg *messages.TaskMessage) error {
 	bc.batchMutex.Lock()
 	defer bc.batchMutex.Unlock()
 
@@ -145,7 +147,7 @@ func (bc *BatchConsumer) processBatchLocked(ctx context.Context) error {
 	}
 
 	// Copy batch for processing
-	batchCopy := make([]*TaskMessage, len(bc.batch))
+	batchCopy := make([]*messages.TaskMessage, len(bc.batch))
 	copy(batchCopy, bc.batch)
 
 	// Clear batch
