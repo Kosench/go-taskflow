@@ -104,7 +104,7 @@ func (s TaskStatus) IsValid() bool {
 	}
 }
 
-func (s TaskStatus) Strinf() string {
+func (s TaskStatus) String() string {
 	return string(s)
 }
 
