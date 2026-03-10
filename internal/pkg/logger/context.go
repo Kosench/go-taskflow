@@ -42,7 +42,7 @@ func WithUserID(ctx context.Context, userID string) context.Context {
 }
 
 // WithFields adds multiple fields to context logger
-func WithFields(ctx context.Context, fields map[string]interface{}) context.Context {
+func WithFields(ctx context.Context, fields map[string]any) context.Context {
 	logger := FromContext(ctx)
 	zl := logger.With().Fields(fields).Logger()
 	return zl.WithContext(ctx)

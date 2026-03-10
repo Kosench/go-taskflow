@@ -66,7 +66,7 @@ func (tc *TaskConsumer) handleMessage(ctx context.Context, msg *messages.TaskMes
 		return err
 	}
 
-	ctx = logger.WithFields(ctx, map[string]interface{}{
+	ctx = logger.WithFields(ctx, map[string]any{
 		"task_id":   task.ID,
 		"task_type": string(task.Type),
 		"priority":  int(task.Priority),

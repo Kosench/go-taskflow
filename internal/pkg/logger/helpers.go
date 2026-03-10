@@ -6,7 +6,7 @@ import (
 )
 
 // Fields type for structured logging
-type Fields map[string]interface{}
+type Fields map[string]any
 
 // LogLevel represents log level
 type LogLevel string

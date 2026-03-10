@@ -130,13 +130,13 @@ func FromContext(ctx context.Context) *Logger {
 }
 
 // WithField adds a field to logger
-func (l *Logger) WithField(key string, value interface{}) *Logger {
+func (l *Logger) WithField(key string, value any) *Logger {
 	zl := l.With().Interface(key, value).Logger()
 	return &Logger{Logger: &zl}
 }
 
 // WithFields adds multiple fields to logger
-func (l *Logger) WithFields(fields map[string]interface{}) *Logger {
+func (l *Logger) WithFields(fields map[string]any) *Logger {
 	zl := l.With().Fields(fields).Logger()
 	return &Logger{Logger: &zl}
 }
@@ -188,26 +188,26 @@ func Fatal(msg string) {
 }
 
 // Debugf logs formatted debug level message
-func Debugf(format string, v ...interface{}) {
+func Debugf(format string, v ...any) {
 	Get().Debug().Msgf(format, v...)
 }
 
 // Infof logs formatted info level message
-func Infof(format string, v ...interface{}) {
+func Infof(format string, v ...any) {
 	Get().Info().Msgf(format, v...)
 }
 
 // Warnf logs formatted warn level message
-func Warnf(format string, v ...interface{}) {
+func Warnf(format string, v ...any) {
 	Get().Warn().Msgf(format, v...)
 }
 
 // Errorf logs formatted error level message
-func Errorf(format string, v ...interface{}) {
+func Errorf(format string, v ...any) {
 	Get().Error().Msgf(format, v...)
 }
 
 // Fatalf logs formatted fatal level message and exits
-func Fatalf(format string, v ...interface{}) {
+func Fatalf(format string, v ...any) {
 	Get().Fatal().Msgf(format, v...)
 }

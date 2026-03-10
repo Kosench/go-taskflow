@@ -18,7 +18,7 @@ type GracefulConsumer struct {
 	logger          *logger.Logger
 
 	shutdownChan chan os.Signal
-	shutdownOnce sync.Once
+	shutdown     func()
 	wg           sync.WaitGroup
 }
 
@@ -41,6 +41,10 @@ func NewGracefulConsumer(
 		shutdownChan:    make(chan os.Signal, 1),
 	}
 
+	gc.shutdown = sync.OnceFunc(func() {
+		gc.doShutdown()
+	})
+
 	// Register signal handlers
 	signal.Notify(gc.shutdownChan, syscall.SIGINT, syscall.SIGTERM)
 
@@ -61,47 +65,45 @@ func (gc *GracefulConsumer) Run(ctx context.Context) error {
 		gc.logger.Info().Msg("context cancelled")
 	}
 
-	return gc.Shutdown()
+	gc.shutdown()
+	return nil
 }
 
-func (gc *GracefulConsumer) Shutdown() error {
-	var err error
+func (gc *GracefulConsumer) Shutdown() {
+	gc.shutdown()
+}
 
-	gc.shutdownOnce.Do(func() {
-		gc.logger.Info().
-			Dur("timeout", gc.shutdownTimeout).
-			Msg("starting graceful shutdown")
+func (gc *GracefulConsumer) doShutdown() {
+	gc.logger.Info().
+		Dur("timeout", gc.shutdownTimeout).
+		Msg("starting graceful shutdown")
 
-		// Create shutdown context with timeout
-		ctx, cancel := context.WithTimeout(context.Background(), gc.shutdownTimeout)
-		defer cancel()
+	// Create shutdown context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), gc.shutdownTimeout)
+	defer cancel()
 
-		// Stop accepting new messages
-		stopChan := make(chan error, 1)
-		go func() {
-			stopChan <- gc.consumer.Stop()
-		}()
+	// Stop accepting new messages
+	stopChan := make(chan error, 1)
+	go func() {
+		stopChan <- gc.consumer.Stop()
+	}()
 
-		// Wait for shutdown or timeout
-		select {
-		case err = <-stopChan:
-			if err != nil {
-				gc.logger.Error().
-					Err(err).
-					Msg("error during shutdown")
-			} else {
-				gc.logger.Info().Msg("graceful shutdown completed")
-			}
-
-		case <-ctx.Done():
-			gc.logger.Warn().
-				Dur("timeout", gc.shutdownTimeout).
-				Msg("shutdown timeout exceeded, forcing shutdown")
-			err = ctx.Err()
+	// Wait for shutdown or timeout
+	select {
+	case err := <-stopChan:
+		if err != nil {
+			gc.logger.Error().
+				Err(err).
+				Msg("error during shutdown")
+		} else {
+			gc.logger.Info().Msg("graceful shutdown completed")
 		}
-	})
 
-	return err
+	case <-ctx.Done():
+		gc.logger.Warn().
+			Dur("timeout", gc.shutdownTimeout).
+			Msg("shutdown timeout exceeded, forcing shutdown")
+	}
 }
 
 // GetStats returns consumer statistics

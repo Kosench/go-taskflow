@@ -1,7 +1,9 @@
 package service
 
 import (
+	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"github.com/Kosench/go-taskflow/internal/domain"
 	"github.com/Kosench/go-taskflow/internal/pkg/logger"
@@ -43,21 +45,13 @@ func (s *taskService) CreateTask(ctx context.Context, req CreateTaskRequest) (*d
 
 	// Set additional fields
 	task.ID = uuid.New().String()
-	if req.MaxRetries > 0 {
-		task.MaxRetries = req.MaxRetries
-	} else {
-		task.MaxRetries = s.defaultRetries
-	}
+	task.MaxRetries = cmp.Or(req.MaxRetries, s.defaultRetries)
 
 	if req.ScheduledAt != nil {
 		task.ScheduledAt = req.ScheduledAt
 	}
 
-	if req.TraceID != "" {
-		task.TraceID = req.TraceID
-	} else {
-		task.TraceID = uuid.New().String()
-	}
+	task.TraceID = cmp.Or(req.TraceID, uuid.New().String())
 
 	task.Metadata = req.Metadata
 
@@ -102,7 +96,7 @@ func (s *taskService) CreateTask(ctx context.Context, req CreateTaskRequest) (*d
 func (s *taskService) GetTask(ctx context.Context, taskID string) (*domain.Task, error) {
 	task, err := s.repo.Get(ctx, taskID)
 	if err != nil {
-		if err == domain.ErrTaskNotFound {
+		if errors.Is(err, domain.ErrTaskNotFound) {
 			return nil, err
 		}
 		s.logger.Error().
@@ -131,12 +125,7 @@ func (s *taskService) ListTask(ctx context.Context, req ListTasksRequest) ([]*do
 		OrderDir:    req.OrderDir,
 	}
 
-	if filter.Limit <= 0 {
-		filter.Limit = 10
-	}
-	if filter.Limit > 100 {
-		filter.Limit = 100
-	}
+	filter.Limit = min(cmp.Or(filter.Limit, 10), 100)
 
 	tasks, err := s.repo.List(ctx, filter)
 	if err != nil {
@@ -218,7 +207,7 @@ func (s *taskService) ProcessTask(ctx context.Context, taskID string, workerID s
 	// Lock task for processing
 	task, err := s.repo.LockTaskForProcessing(ctx, taskID, workerID)
 	if err != nil {
-		if err == domain.ErrTaskNotFound {
+		if errors.Is(err, domain.ErrTaskNotFound) {
 			s.logger.Warn().
 				Str("task_id", taskID).
 				Str("worker_id", workerID).
@@ -383,14 +372,7 @@ func (s *taskService) calculateRetryDelay(retries int) time.Duration {
 		return time.Second
 	}
 
-	// Exponential backoff: 2^retries seconds
+	// Exponential backoff: 2^retries seconds, capped at 5 minutes
 	backoff := time.Duration(1<<uint(retries)) * time.Second
-
-	// Cap at 5 minutes
-	maxBackoff := 5 * time.Minute
-	if backoff > maxBackoff {
-		backoff = maxBackoff
-	}
-
-	return backoff
+	return min(backoff, 5*time.Minute)
 }

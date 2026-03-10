@@ -95,7 +95,7 @@ func TestBatchConsumer_HandleMessage(t *testing.T) {
 	ctx := context.Background()
 
 	// Add messages to batch
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		msg := &messages.TaskMessage{
 			ID:   fmt.Sprintf("test-%d", i),
 			Type: "test",
@@ -141,7 +141,7 @@ func TestBatchConsumer_Timeout(t *testing.T) {
 	ctx := context.Background()
 
 	// Add only 2 messages (less than batch size)
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		msg := &messages.TaskMessage{
 			ID:   fmt.Sprintf("timeout-%d", i),
 			Type: "test",
@@ -196,8 +196,7 @@ func TestConsumer_Integration(t *testing.T) {
 	c, err := NewConsumer(cfg, handler, log)
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	ctx := t.Context()
 
 	// Start consumer
 	err = c.Start(ctx)

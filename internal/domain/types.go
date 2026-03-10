@@ -43,7 +43,7 @@ func (t TaskType) String() string {
 	return string(t)
 }
 
-func (t *TaskType) Scan(value interface{}) error {
+func (t *TaskType) Scan(value any) error {
 	if value == nil {
 		return nil
 	}
@@ -109,7 +109,7 @@ func (s TaskStatus) Strinf() string {
 }
 
 // Scan implements sql.Scanner interface
-func (s *TaskStatus) Scan(value interface{}) error {
+func (s *TaskStatus) Scan(value any) error {
 	if value == nil {
 		return nil
 	}
@@ -174,7 +174,7 @@ func (p Priority) String() string {
 }
 
 // Scan implements sql.Scanner interface
-func (p *Priority) Scan(value interface{}) error {
+func (p *Priority) Scan(value any) error {
 	if value == nil {
 		return nil
 	}

@@ -16,18 +16,18 @@ type TaskMessage struct {
 	MaxRetries  int             `json:"max_retries"`
 	TraceID     string          `json:"trace_id,omitempty"`
 	CreatedAt   time.Time       `json:"created_at"`
-	ScheduledAt *time.Time      `json:"scheduled_at,omitempty"`
+	ScheduledAt *time.Time      `json:"scheduled_at,omitzero"`
 }
 
 // TaskResultMessage represents task result message
 type TaskResultMessage struct {
 	TaskID      string          `json:"task_id"`
 	Status      string          `json:"status"`
-	Result      json.RawMessage `json:"result,omitempty"`
+	Result      json.RawMessage `json:"result,omitzero"`
 	Error       string          `json:"error,omitempty"`
 	WorkerID    string          `json:"worker_id"`
 	ProcessedAt time.Time       `json:"processed_at"`
-	Duration    time.Duration   `json:"duration_ms"`
+	Duration    time.Duration   `json:"duration_ms,omitzero"`
 }
 
 // RetryMessage represents retry message

@@ -14,7 +14,7 @@ import (
 type JSONB []byte
 
 // Scan implements the Scanner interface for JSONB
-func (j *JSONB) Scan(value interface{}) error {
+func (j *JSONB) Scan(value any) error {
 	if value == nil {
 		*j = nil
 		return nil

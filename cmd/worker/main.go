@@ -49,7 +49,7 @@ func processTask(ctx context.Context, taskID string) {
 	start := time.Now()
 
 	// Add task ID to context
-	ctx = logger.WithFields(ctx, map[string]interface{}{
+	ctx = logger.WithFields(ctx, map[string]any{
 		"task_id":   taskID,
 		"task_type": "example",
 	})

@@ -83,7 +83,7 @@ func TestLoggerFields(t *testing.T) {
 	}
 
 	// Test with multiple fields
-	fields := map[string]interface{}{
+	fields := map[string]any{
 		"field1": "value1",
 		"field2": 42,
 		"field3": true,
@@ -117,7 +117,7 @@ func TestJSONOutput(t *testing.T) {
 	logger.Info().Str("test", "value").Msg("test message")
 
 	// In real test, you'd parse JSON and verify fields
-	var logEntry map[string]interface{}
+	var logEntry map[string]any
 	if err := json.NewDecoder(&buf).Decode(&logEntry); err == nil {
 		// Verify log entry structure
 		if logEntry["test"] != "value" {

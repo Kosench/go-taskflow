@@ -81,7 +81,7 @@ func TestTaskRepository_Create(t *testing.T) {
 
 		// Try to create duplicate
 		err = repo.Create(ctx, task)
-		assert.Equal(t, domain.ErrTaskAlreadyExists, err)
+		assert.ErrorIs(t, err, domain.ErrTaskAlreadyExists)
 	})
 }
 
@@ -105,7 +105,7 @@ func TestTaskRepository_Get(t *testing.T) {
 
 	t.Run("get non-existent task", func(t *testing.T) {
 		_, err := repo.Get(ctx, "non-existent-id")
-		assert.Equal(t, domain.ErrTaskNotFound, err)
+		assert.ErrorIs(t, err, domain.ErrTaskNotFound)
 	})
 }
 
@@ -138,7 +138,7 @@ func TestTaskRepository_Update(t *testing.T) {
 	t.Run("update non-existent task", func(t *testing.T) {
 		task := createTestTask()
 		err := repo.Update(ctx, task)
-		assert.Equal(t, domain.ErrTaskNotFound, err)
+		assert.ErrorIs(t, err, domain.ErrTaskNotFound)
 	})
 }
 
@@ -183,7 +183,7 @@ func TestTaskRepository_List(t *testing.T) {
 	ctx := context.Background()
 
 	// Create test tasks
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		task := createTestTask()
 		if i%2 == 0 {
 			task.Type = domain.TaskTypeSendEmail
@@ -245,7 +245,7 @@ func TestTaskRepository_BulkCreate(t *testing.T) {
 
 	// Create multiple tasks
 	tasks := make([]*domain.Task, 5)
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		tasks[i] = createTestTask()
 	}
 
@@ -281,7 +281,7 @@ func TestTaskRepository_LockTaskForProcessing(t *testing.T) {
 
 	// Try to lock again (should fail)
 	_, err = repo.LockTaskForProcessing(ctx, task.ID, "another-worker")
-	assert.Equal(t, domain.ErrTaskNotFound, err)
+	assert.ErrorIs(t, err, domain.ErrTaskNotFound)
 }
 
 func TestTaskRepository_CleanupOldTasks(t *testing.T) {
@@ -325,7 +325,7 @@ func TestTaskRepository_CleanupOldTasks(t *testing.T) {
 
 	// Verify old task was deleted
 	_, err = repo.Get(ctx, oldTask.ID)
-	assert.Equal(t, domain.ErrTaskNotFound, err)
+	assert.ErrorIs(t, err, domain.ErrTaskNotFound)
 
 	// Verify recent task still exists
 	_, err = repo.Get(ctx, recentTask.ID)

@@ -38,7 +38,7 @@ func main() {
 	ctx := context.Background()
 
 	// Send tasks
-	for i := 0; i < *count; i++ {
+	for range *count {
 		task := &domain.Task{
 			ID:         uuid.New().String(),
 			Type:       domain.TaskType(*taskType),
@@ -71,23 +71,23 @@ func main() {
 }
 
 func generatePayload(taskType string) []byte {
-	var payload interface{}
+	var payload any
 
 	switch taskType {
 	case "image_resize":
-		payload = map[string]interface{}{
+		payload = map[string]any{
 			"width":  800,
 			"height": 600,
 			"url":    "https://example.com/image.jpg",
 		}
 	case "send_email":
-		payload = map[string]interface{}{
+		payload = map[string]any{
 			"to":      "user@example.com",
 			"subject": "Test Email",
 			"body":    "This is a test email",
 		}
 	default:
-		payload = map[string]interface{}{
+		payload = map[string]any{
 			"data": "test",
 		}
 	}

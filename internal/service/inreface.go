@@ -26,19 +26,19 @@ type CreateTaskRequest struct {
 	Priority    domain.Priority   `json:"priority"`
 	Payload     []byte            `json:"payload" validate:"required"`
 	MaxRetries  int               `json:"max_retries"`
-	ScheduledAt *time.Time        `json:"scheduled_at,omitempty"`
-	Metadata    map[string]string `json:"metadata,omitempty"`
+	ScheduledAt *time.Time        `json:"scheduled_at,omitzero"`
+	Metadata    map[string]string `json:"metadata,omitzero"`
 	TraceID     string            `json:"trace_id,omitempty"`
 }
 
 type ListTasksRequest struct {
-	Status      []domain.TaskStatus `json:"status,omitempty"`
-	Type        []domain.TaskType   `json:"type,omitempty"`
-	Priority    []domain.Priority   `json:"priority,omitempty"`
+	Status      []domain.TaskStatus `json:"status,omitzero"`
+	Type        []domain.TaskType   `json:"type,omitzero"`
+	Priority    []domain.Priority   `json:"priority,omitzero"`
 	WorkerID    string              `json:"worker_id,omitempty"`
 	TraceID     string              `json:"trace_id,omitempty"`
-	CreatedFrom time.Time           `json:"created_from,omitempty"`
-	CreatedTo   time.Time           `json:"created_to,omitempty"`
+	CreatedFrom time.Time           `json:"created_from,omitzero"`
+	CreatedTo   time.Time           `json:"created_to,omitzero"`
 	Limit       int                 `json:"limit"`
 	Offset      int                 `json:"offset"`
 	OrderBy     string              `json:"order_by"`

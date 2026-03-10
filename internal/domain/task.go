@@ -34,18 +34,18 @@ type Task struct {
 	Status      TaskStatus `json:"status" db:"status"`
 	Priority    Priority   `json:"priority" db:"priority"`
 	Payload     []byte     `json:"payload" db:"payload"`
-	Result      []byte     `json:"result,omitempty" db:"result"`
+	Result      []byte     `json:"result,omitzero" db:"result"`
 	Error       string     `json:"error,omitempty" db:"error"`
 	Retries     int        `json:"retries" db:"retries"`
 	MaxRetries  int        `json:"max_retries" db:"max_retries"`
 	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at" db:"updated_at"`
-	ScheduledAt *time.Time `json:"scheduled_at,omitempty" db:"scheduled_at"`
-	StartedAt   *time.Time `json:"started_at,omitempty" db:"started_at"`
-	CompletedAt *time.Time `json:"completed_at,omitempty" db:"completed_at"`
+	ScheduledAt *time.Time `json:"scheduled_at,omitzero" db:"scheduled_at"`
+	StartedAt   *time.Time `json:"started_at,omitzero" db:"started_at"`
+	CompletedAt *time.Time `json:"completed_at,omitzero" db:"completed_at"`
 
 	// Additional metadata
-	Metadata map[string]string `json:"metadata,omitempty" db:"-"`
+	Metadata map[string]string `json:"metadata,omitzero" db:"-"`
 	WorkerID string            `json:"worker_id,omitempty" db:"worker_id"`
 	TraceID  string            `json:"trace_id,omitempty" db:"trace_id"`
 }

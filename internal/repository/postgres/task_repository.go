@@ -1,8 +1,10 @@
 package postgres
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"github.com/Kosench/go-taskflow/internal/domain"
 	"github.com/Kosench/go-taskflow/internal/pkg/database"
@@ -45,7 +47,8 @@ func (r *TaskRepository) Create(ctx context.Context, task *domain.Task) error {
 
 	_, err := r.db.NamedExecContext(ctx, query, dbTask)
 	if err != nil {
-		if pqErr, ok := err.(*pq.Error); ok {
+		var pqErr *pq.Error
+		if errors.As(err, &pqErr) {
 			if pqErr.Code == "23505" { // unique_violation
 				return domain.ErrTaskAlreadyExists
 			}
@@ -75,7 +78,7 @@ func (r *TaskRepository) Get(ctx context.Context, id string) (*domain.Task, erro
 	var dbTask dbTask
 	err := r.db.GetContext(ctx, &dbTask, query, id)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, domain.ErrTaskNotFound
 		}
 		return nil, fmt.Errorf("failed to get task: %w", err)
@@ -214,7 +217,7 @@ func (r *TaskRepository) List(ctx context.Context, filter repository.TaskFilter)
 		WHERE 1=1
 	`
 
-	args := []interface{}{}
+	args := []any{}
 	argCount := 0
 
 	// Build dynamic query
@@ -261,15 +264,8 @@ func (r *TaskRepository) List(ctx context.Context, filter repository.TaskFilter)
 	}
 
 	// Add ordering
-	orderBy := "created_at"
-	if filter.OrderBy != "" {
-		orderBy = filter.OrderBy
-	}
-
-	orderDir := "DESC"
-	if filter.OrderDir != "" {
-		orderDir = strings.ToUpper(filter.OrderDir)
-	}
+	orderBy := cmp.Or(filter.OrderBy, "created_at")
+	orderDir := cmp.Or(strings.ToUpper(filter.OrderDir), "DESC")
 
 	query += fmt.Sprintf(" ORDER BY %s %s", orderBy, orderDir)
 
@@ -517,7 +513,7 @@ func (r *TaskRepository) LockTaskForProcessing(ctx context.Context, taskID, work
 	var dbTask dbTask
 	err := r.db.GetContext(ctx, &dbTask, query, taskID, workerID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, domain.ErrTaskNotFound
 		}
 		return nil, fmt.Errorf("failed to lock task for processing: %w", err)
