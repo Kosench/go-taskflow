@@ -86,9 +86,6 @@ func (s *taskService) CreateTask(ctx context.Context, req CreateTaskRequest) (*d
 		Str("trace_id", task.TraceID).
 		Msg("task created successfully")
 
-	// Track metrics
-	taskCreatedCounter.WithLabelValues(string(task.Type)).Inc()
-
 	return task, nil
 }
 
@@ -198,9 +195,6 @@ func (s *taskService) UpdateTaskStatus(ctx context.Context, taskID string, statu
 		Str("new_status", string(status)).
 		Msg("task status updated")
 
-	// Track metrics
-	taskStatusChangedCounter.WithLabelValues(string(previousStatus), string(status)).Inc()
-
 	return nil
 }
 func (s *taskService) ProcessTask(ctx context.Context, taskID string, workerID string) error {
@@ -222,10 +216,6 @@ func (s *taskService) ProcessTask(ctx context.Context, taskID string, workerID s
 		Str("worker_id", workerID).
 		Str("type", string(task.Type)).
 		Msg("task locked for processing")
-
-	// Track metrics
-	tasksProcessingGauge.Inc()
-	defer tasksProcessingGauge.Dec()
 
 	return nil
 }
@@ -295,10 +285,6 @@ func (s *taskService) RetryTask(ctx context.Context, taskID string) error {
 		Time("scheduled_at", nextRetry).
 		Msg("task scheduled for retry")
 
-	// Track metrics
-	taskRetriedCounter.WithLabelValues(string(task.Type)).Inc()
-	taskRetryBackoffHistogram.WithLabelValues(string(task.Type)).Observe(backoff.Seconds())
-
 	return nil
 }
 
@@ -327,9 +313,6 @@ func (s *taskService) CancelTask(ctx context.Context, taskID string, reason stri
 		Str("task_id", taskID).
 		Str("reason", reason).
 		Msg("task cancelled")
-
-	// Track metrics
-	taskCancelledCounter.WithLabelValues(string(task.Type)).Inc()
 
 	return nil
 }

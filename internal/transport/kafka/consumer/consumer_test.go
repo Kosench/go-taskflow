@@ -61,8 +61,22 @@ func TestConsumerGroupHandler_processMessage(t *testing.T) {
 		},
 	}
 
-	// Set expectation
-	mockHandler.On("HandleMessage", mock.Anything, &taskMsg).Return(nil)
+	// JSON is normalized during marshal/unmarshal, so compare it semantically.
+	mockHandler.On("HandleMessage", mock.Anything, mock.MatchedBy(func(actual *messages.TaskMessage) bool {
+		if actual == nil || actual.ID != taskMsg.ID || actual.Type != taskMsg.Type || actual.Priority != taskMsg.Priority {
+			return false
+		}
+
+		var expectedPayload, actualPayload any
+		if err := json.Unmarshal(taskMsg.Payload, &expectedPayload); err != nil {
+			return false
+		}
+		if err := json.Unmarshal(actual.Payload, &actualPayload); err != nil {
+			return false
+		}
+
+		return assert.ObjectsAreEqual(expectedPayload, actualPayload)
+	})).Return(nil)
 
 	// Process message
 	ctx := context.Background()

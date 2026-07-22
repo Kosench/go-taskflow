@@ -15,6 +15,12 @@ import (
 )
 
 func setupTestDB(t *testing.T) *database.DB {
+	t.Helper()
+
+	if testing.Short() {
+		t.Skip("skipping PostgreSQL integration test in short mode")
+	}
+
 	cfg := &config.DatabaseConfig{
 		Host:            "localhost",
 		Port:            5432,
