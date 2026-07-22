@@ -1,23 +1,6 @@
 -- Create extension for UUID generation
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Create ENUM types
-CREATE TYPE task_status AS ENUM (
-    'pending',
-    'processing',
-    'completed',
-    'failed',
-    'retrying',
-    'cancelled'
-);
-
-CREATE TYPE task_priority AS ENUM (
-    'low',
-    'normal',
-    'high',
-    'critical'
-);
-
 -- Create a simple health check table
 CREATE TABLE IF NOT EXISTS health_check (
     id SERIAL PRIMARY KEY,

@@ -13,20 +13,13 @@ server:
     max_connection_age: 15m
 
 database:
-  host: ${DB_HOST}
-  port: ${DB_PORT}
-  name: ${DB_NAME}
-  user: ${DB_USER}
-  password: ${DB_PASSWORD}
+  # Connection credentials are supplied through TASKQUEUE_DATABASE_* variables.
   ssl_mode: require
   max_open_conns: 100
   max_idle_conns: 10
 
 kafka:
-  brokers:
-    - ${KAFKA_BROKER_1}
-    - ${KAFKA_BROKER_2}
-    - ${KAFKA_BROKER_3}
+  # Brokers are supplied through TASKQUEUE_KAFKA_BROKERS.
   producer:
     required_acks: -1  # Wait for all ISR
     compression: snappy

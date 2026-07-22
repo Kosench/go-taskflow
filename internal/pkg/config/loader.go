@@ -11,39 +11,44 @@ import (
 func Load(configPath string) (*Config, error) {
 	v := viper.New()
 
-	if configPath != "" {
-		v.SetConfigFile(configPath)
-	} else {
-		v.SetConfigName("config")
-		v.SetConfigType("yaml")
-		v.AddConfigPath("./configs")
-		v.AddConfigPath(".")
-	}
-	// Environment-specific config
-	env := os.Getenv("APP_ENV")
-	if env == "" {
-		env = "development"
-	}
-
-	// Try to load environment-specific config
-	envConfigPath := filepath.Join("configs", fmt.Sprintf("config.%s.yaml", env))
-	if _, err := os.Stat(envConfigPath); err == nil {
-		v.SetConfigFile(envConfigPath)
-	}
-
 	// Environment variables
 	v.SetEnvPrefix("TASKQUEUE")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
 	v.AutomaticEnv()
 
-	// Set defaults
+	// Defaults are the lowest-precedence configuration layer.
 	setDefaults(v)
 
-	// Read config file
-	if err := v.ReadInConfig(); err != nil {
-		// It's okay if config file doesn't exist, we have defaults and env vars
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			return nil, fmt.Errorf("failed to read config file: %w", err)
+	if configPath != "" {
+		v.SetConfigFile(configPath)
+		if err := v.ReadInConfig(); err != nil {
+			return nil, fmt.Errorf("failed to read config file %q: %w", configPath, err)
+		}
+	} else {
+		v.SetConfigName("config")
+		v.SetConfigType("yaml")
+		v.AddConfigPath("./configs")
+		v.AddConfigPath(".")
+
+		// The base config is optional because defaults and environment variables
+		// are sufficient for command-line tools and tests.
+		if err := v.ReadInConfig(); err != nil {
+			if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+				return nil, fmt.Errorf("failed to read base config: %w", err)
+			}
+		}
+
+		env := os.Getenv("APP_ENV")
+		if env == "" {
+			env = "development"
+		}
+
+		envConfigPath := filepath.Join("configs", fmt.Sprintf("config.%s.yaml", env))
+		if _, err := os.Stat(envConfigPath); err == nil {
+			v.SetConfigFile(envConfigPath)
+			if err := v.MergeInConfig(); err != nil {
+				return nil, fmt.Errorf("failed to merge %s config: %w", env, err)
+			}
 		}
 	}
 
