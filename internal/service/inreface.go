@@ -14,7 +14,7 @@ type TaskService interface {
 	GetTask(ctx context.Context, taskID string) (*domain.Task, error)
 	ListTask(ctx context.Context, filter ListTasksRequest) ([]*domain.Task, error)
 	UpdateTaskStatus(ctx context.Context, taskID string, status domain.TaskStatus, result []byte, errorMsg string) error
-	ProcessTask(ctx context.Context, taskID string, workerID string) error
+	ProcessTask(ctx context.Context, taskID string, workerID string) (*domain.Task, error)
 	RetryTask(ctx context.Context, taskID string) error
 	CancelTask(ctx context.Context, taskID string, reason string) error
 	GetTaskStats(ctx context.Context) (*repository.TaskStats, error)

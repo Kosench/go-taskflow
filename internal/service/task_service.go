@@ -202,7 +202,7 @@ func (s *taskService) UpdateTaskStatus(ctx context.Context, taskID string, statu
 
 	return nil
 }
-func (s *taskService) ProcessTask(ctx context.Context, taskID string, workerID string) error {
+func (s *taskService) ProcessTask(ctx context.Context, taskID string, workerID string) (*domain.Task, error) {
 	// Lock task for processing
 	task, err := s.repo.LockTaskForProcessing(ctx, taskID, workerID)
 	if err != nil {
@@ -211,9 +211,9 @@ func (s *taskService) ProcessTask(ctx context.Context, taskID string, workerID s
 				Str("task_id", taskID).
 				Str("worker_id", workerID).
 				Msg("task not found or already processing")
-			return err
+			return nil, err
 		}
-		return fmt.Errorf("failed to lock task: %w", err)
+		return nil, fmt.Errorf("failed to lock task: %w", err)
 	}
 
 	s.logger.Info().
@@ -222,7 +222,7 @@ func (s *taskService) ProcessTask(ctx context.Context, taskID string, workerID s
 		Str("type", string(task.Type)).
 		Msg("task locked for processing")
 
-	return nil
+	return task, nil
 }
 
 func (s *taskService) RetryTask(ctx context.Context, taskID string) error {
