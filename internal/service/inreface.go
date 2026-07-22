@@ -2,8 +2,10 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"github.com/Kosench/go-taskflow/internal/domain"
 	"github.com/Kosench/go-taskflow/internal/repository"
+	"strings"
 	"time"
 )
 
@@ -62,5 +64,42 @@ func (r *CreateTaskRequest) Validate() error {
 		return domain.NewValidationError("scheduled_at", "cannot be in the past")
 	}
 
+	return nil
+}
+
+func (r *ListTasksRequest) Validate() error {
+	if r.Limit < 0 {
+		return domain.NewValidationError("limit", "cannot be negative")
+	}
+	if r.Offset < 0 {
+		return domain.NewValidationError("offset", "cannot be negative")
+	}
+	for _, status := range r.Status {
+		if !status.IsValid() {
+			return domain.NewValidationError("status", fmt.Sprintf("invalid value %q", status))
+		}
+	}
+	for _, taskType := range r.Type {
+		if !taskType.IsValid() {
+			return domain.NewValidationError("type", fmt.Sprintf("invalid value %q", taskType))
+		}
+	}
+	for _, priority := range r.Priority {
+		if !priority.IsValid() {
+			return domain.NewValidationError("priority", fmt.Sprintf("invalid value %d", priority))
+		}
+	}
+
+	allowedOrderBy := map[string]bool{"": true, "created_at": true, "updated_at": true, "priority": true}
+	if !allowedOrderBy[r.OrderBy] {
+		return domain.NewValidationError("order_by", "must be created_at, updated_at, or priority")
+	}
+	orderDir := strings.ToLower(r.OrderDir)
+	if orderDir != "" && orderDir != "asc" && orderDir != "desc" {
+		return domain.NewValidationError("order_dir", "must be asc or desc")
+	}
+	if !r.CreatedFrom.IsZero() && !r.CreatedTo.IsZero() && r.CreatedFrom.After(r.CreatedTo) {
+		return domain.NewValidationError("created_from", "cannot be after created_to")
+	}
 	return nil
 }

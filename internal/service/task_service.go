@@ -113,6 +113,10 @@ func (s *taskService) GetTask(ctx context.Context, taskID string) (*domain.Task,
 
 // ListTasks lists tasks with filtering
 func (s *taskService) ListTask(ctx context.Context, req ListTasksRequest) ([]*domain.Task, error) {
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
 	filter := repository.TaskFilter{
 		Status:      req.Status,
 		Type:        req.Type,
@@ -232,12 +236,11 @@ func (s *taskService) RetryTask(ctx context.Context, taskID string) error {
 	}
 
 	if task.Status != domain.TaskStatusFailed {
-		return fmt.Errorf("cannot retry task in status %s (must be failed)", task.Status)
+		return domain.NewConflictError("task", fmt.Sprintf("cannot retry status %s", task.Status))
 	}
 
 	if !task.CanRetry() {
-		return fmt.Errorf("task cannot be retried: max retries reached (%d/%d)",
-			task.Retries, task.MaxRetries)
+		return domain.NewConflictError("task", fmt.Sprintf("max retries reached (%d/%d)", task.Retries, task.MaxRetries))
 	}
 
 	task.Status = domain.TaskStatusRetrying
@@ -280,7 +283,7 @@ func (s *taskService) CancelTask(ctx context.Context, taskID string, reason stri
 
 	// Check if task can be cancelled
 	if task.IsTerminal() {
-		return fmt.Errorf("task is already in terminal state: %s", task.Status)
+		return domain.NewConflictError("task", fmt.Sprintf("already in terminal state %s", task.Status))
 	}
 
 	// Mark as cancelled

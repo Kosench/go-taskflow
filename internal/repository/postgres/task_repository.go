@@ -266,6 +266,13 @@ func (r *TaskRepository) List(ctx context.Context, filter repository.TaskFilter)
 	// Add ordering
 	orderBy := cmp.Or(filter.OrderBy, "created_at")
 	orderDir := cmp.Or(strings.ToUpper(filter.OrderDir), "DESC")
+	allowedOrderBy := map[string]bool{"created_at": true, "updated_at": true, "priority": true}
+	if !allowedOrderBy[orderBy] {
+		return nil, fmt.Errorf("invalid order column %q", orderBy)
+	}
+	if orderDir != "ASC" && orderDir != "DESC" {
+		return nil, fmt.Errorf("invalid order direction %q", orderDir)
+	}
 
 	query += fmt.Sprintf(" ORDER BY %s %s", orderBy, orderDir)
 
