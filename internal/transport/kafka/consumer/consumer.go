@@ -30,9 +30,10 @@ type Consumer struct {
 	mu               sync.RWMutex
 
 	// Control
-	ready   chan bool
-	closing chan struct{}
-	closed  chan struct{}
+	ready     chan bool
+	readyOnce sync.Once
+	closing   chan struct{}
+	closed    chan struct{}
 }
 
 // MessageHandler is the interface for handling messages
@@ -118,11 +119,15 @@ func (c *Consumer) Start(ctx context.Context) error {
 		}
 	}()
 
-	// Wait for consumer to be ready
-	<-c.ready
-	c.logger.Info().Msg("consumer started and ready")
-
-	return nil
+	select {
+	case <-c.ready:
+		c.logger.Info().Msg("consumer started and ready")
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-c.closing:
+		return fmt.Errorf("consumer stopped before becoming ready")
+	}
 }
 
 // Stop stops the consumer
@@ -161,7 +166,7 @@ type consumerGroupHandler struct {
 // Setup is run at the beginning of a new session, before ConsumeClaim
 func (h *consumerGroupHandler) Setup(sarama.ConsumerGroupSession) error {
 	h.consumer.logger.Debug().Msg("consumer group session setup")
-	close(h.ready)
+	h.consumer.readyOnce.Do(func() { close(h.ready) })
 	return nil
 }
 
@@ -205,12 +210,16 @@ func (h *consumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupSession,
 					Int64("offset", message.Offset).
 					Msg("failed to process message")
 
-				// Continue processing other messages even if one fails
-				// In production, you might want to send to DLQ or retry
+				// Stop this claim without advancing the partition offset. The
+				// message will be delivered again in the next consumer session.
+				return err
 			}
 
 			// Mark message as processed
 			session.MarkMessage(message, "")
+			if !h.consumer.config.Consumer.EnableAutoCommit {
+				session.Commit()
+			}
 
 		case <-h.consumer.closing:
 			return nil

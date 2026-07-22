@@ -3,6 +3,7 @@ package producer
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -85,6 +86,37 @@ func TestProducer_prepareTaskMessage(t *testing.T) {
 
 	assert.True(t, foundTaskID, "task_id header not found")
 	assert.True(t, foundTaskType, "task_type header not found")
+}
+
+func TestNotifyDelivery(t *testing.T) {
+	expectedErr := errors.New("broker rejected message")
+	result := make(chan deliveryResult, 1)
+	msg := &sarama.ProducerMessage{Metadata: &deliveryMetadata{result: result}}
+
+	notifyDelivery(msg, expectedErr)
+
+	select {
+	case delivery := <-result:
+		assert.ErrorIs(t, delivery.err, expectedErr)
+	case <-time.After(time.Second):
+		t.Fatal("delivery result was not reported")
+	}
+}
+
+func TestTaskProducer_PublishRetryDoesNotMutateOrPublishFutureTask(t *testing.T) {
+	scheduledAt := time.Now().Add(time.Minute)
+	task := &domain.Task{
+		ID:          "future-task",
+		Retries:     1,
+		ScheduledAt: &scheduledAt,
+	}
+	tp := &TaskProducer{}
+
+	err := tp.PublishRetry(context.Background(), task)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "is not ready")
+	assert.Equal(t, 1, task.Retries)
 }
 
 func TestTaskMessage_Marshal(t *testing.T) {

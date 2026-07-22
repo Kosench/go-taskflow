@@ -56,18 +56,17 @@ func (tp *TaskProducer) PublishTask(ctx context.Context, task *domain.Task) erro
 		Timestamp: task.CreatedAt,
 	}
 
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case tp.producer.producer.Input() <- msg:
-		tp.logger.Debug().
-			Str("task_id", task.ID).
-			Str("topic", topic).
-			Str("type", string(task.Type)).
-			Int("priority", int(task.Priority)).
-			Msg("task published to Kafka")
-		return nil
+	if err := tp.producer.SendMessage(ctx, msg); err != nil {
+		return fmt.Errorf("failed to publish task: %w", err)
 	}
+
+	tp.logger.Debug().
+		Str("task_id", task.ID).
+		Str("topic", topic).
+		Str("type", string(task.Type)).
+		Int("priority", int(task.Priority)).
+		Msg("task published to Kafka")
+	return nil
 }
 
 // PublishTaskResult publishes task processing result
@@ -90,47 +89,22 @@ func (tp *TaskProducer) PublishTaskResult(ctx context.Context, result *messages.
 		},
 	}
 
-	// Send message
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case tp.producer.producer.Input() <- msg:
-		tp.logger.Debug().
-			Str("task_id", result.TaskID).
-			Str("status", result.Status).
-			Msg("task result published")
-		return nil
+	if err := tp.producer.SendMessage(ctx, msg); err != nil {
+		return fmt.Errorf("failed to publish task result: %w", err)
 	}
+
+	tp.logger.Debug().
+		Str("task_id", result.TaskID).
+		Str("status", result.Status).
+		Msg("task result published")
+	return nil
 }
 
 func (tp *TaskProducer) PublishRetry(ctx context.Context, task *domain.Task) error {
-	// Increment retry count
-	task.IncrementRetries()
-
-	// Convert to retry message
-	retryMsg := tp.converter.ToRetryMessage(task, fmt.Errorf("retry attempt %d", task.Retries))
-
-	// Marshal retry info
-	retryValue, err := json.Marshal(retryMsg)
-	if err != nil {
-		return fmt.Errorf("failed to marshal retry message: %w", err)
+	if task.ScheduledAt != nil && task.ScheduledAt.After(time.Now()) {
+		return fmt.Errorf("task %s is not ready before %s", task.ID, task.ScheduledAt.UTC().Format(time.RFC3339))
 	}
 
-	// Send to retry topic
-	retryInfoMsg := &sarama.ProducerMessage{
-		Topic: tp.config.Topics.TasksRetry + "-info",
-		Key:   sarama.StringEncoder(task.ID),
-		Value: sarama.ByteEncoder(retryValue),
-	}
-
-	select {
-	case tp.producer.producer.Input() <- retryInfoMsg:
-		// Continue to send actual task
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-
-	// Send task to retry topic
 	taskMsg, err := tp.converter.ToKafkaMessage(task)
 	if err != nil {
 		return fmt.Errorf("failed to convert task for retry: %w", err)
@@ -148,22 +122,15 @@ func (tp *TaskProducer) PublishRetry(ctx context.Context, task *domain.Task) err
 		Headers: tp.createHeaders(task),
 	}
 
-	// Schedule retry with delay
-	if task.ScheduledAt != nil {
-		msg.Timestamp = *task.ScheduledAt
+	if err := tp.producer.SendMessage(ctx, msg); err != nil {
+		return fmt.Errorf("failed to publish task for retry: %w", err)
 	}
 
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case tp.producer.producer.Input() <- msg:
-		tp.logger.Info().
-			Str("task_id", task.ID).
-			Int("retry_attempt", task.Retries).
-			Time("scheduled_at", *task.ScheduledAt).
-			Msg("task scheduled for retry")
-		return nil
-	}
+	tp.logger.Info().
+		Str("task_id", task.ID).
+		Int("retry_attempt", task.Retries).
+		Msg("task published for retry")
+	return nil
 }
 
 func (tp *TaskProducer) PublishToDLQ(ctx context.Context, task *domain.Task, originalTopic string, err error) error {
@@ -189,18 +156,16 @@ func (tp *TaskProducer) PublishToDLQ(ctx context.Context, task *domain.Task, ori
 		},
 	}
 
-	// Send message
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case tp.producer.producer.Input() <- msg:
-		tp.logger.Warn().
-			Str("task_id", task.ID).
-			Str("original_topic", originalTopic).
-			Err(err).
-			Msg("task sent to DLQ")
-		return nil
+	if publishErr := tp.producer.SendMessage(ctx, msg); publishErr != nil {
+		return fmt.Errorf("failed to publish task to DLQ: %w", publishErr)
 	}
+
+	tp.logger.Warn().
+		Str("task_id", task.ID).
+		Str("original_topic", originalTopic).
+		Err(err).
+		Msg("task sent to DLQ")
+	return nil
 }
 
 func (tp *TaskProducer) getTopicByPriority(priority domain.Priority) string {

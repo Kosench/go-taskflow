@@ -3,6 +3,7 @@ package consumer
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -21,6 +22,31 @@ import (
 type MockMessageHandler struct {
 	mock.Mock
 }
+
+type fakeConsumerGroupSession struct {
+	ctx       context.Context
+	marked    int
+	committed int
+}
+
+func (s *fakeConsumerGroupSession) Claims() map[string][]int32                  { return nil }
+func (s *fakeConsumerGroupSession) MemberID() string                            { return "test-member" }
+func (s *fakeConsumerGroupSession) GenerationID() int32                         { return 1 }
+func (s *fakeConsumerGroupSession) MarkOffset(string, int32, int64, string)     {}
+func (s *fakeConsumerGroupSession) Commit()                                     { s.committed++ }
+func (s *fakeConsumerGroupSession) ResetOffset(string, int32, int64, string)    {}
+func (s *fakeConsumerGroupSession) MarkMessage(*sarama.ConsumerMessage, string) { s.marked++ }
+func (s *fakeConsumerGroupSession) Context() context.Context                    { return s.ctx }
+
+type fakeConsumerGroupClaim struct {
+	messages <-chan *sarama.ConsumerMessage
+}
+
+func (c *fakeConsumerGroupClaim) Topic() string                            { return "tasks-normal" }
+func (c *fakeConsumerGroupClaim) Partition() int32                         { return 0 }
+func (c *fakeConsumerGroupClaim) InitialOffset() int64                     { return 0 }
+func (c *fakeConsumerGroupClaim) HighWaterMarkOffset() int64               { return 1 }
+func (c *fakeConsumerGroupClaim) Messages() <-chan *sarama.ConsumerMessage { return c.messages }
 
 func (m *MockMessageHandler) HandleMessage(ctx context.Context, msg *messages.TaskMessage) error {
 	args := m.Called(ctx, msg)
@@ -84,6 +110,51 @@ func TestConsumerGroupHandler_processMessage(t *testing.T) {
 
 	assert.NoError(t, err)
 	mockHandler.AssertExpectations(t)
+}
+
+func TestConsumerGroupHandler_Offsets(t *testing.T) {
+	newClaim := func() sarama.ConsumerGroupClaim {
+		messagesCh := make(chan *sarama.ConsumerMessage, 1)
+		messagesCh <- &sarama.ConsumerMessage{
+			Topic: "tasks-normal",
+			Value: []byte(`{"id":"task-1","type":"send_email","priority":1,"payload":{}}`),
+		}
+		close(messagesCh)
+		return &fakeConsumerGroupClaim{messages: messagesCh}
+	}
+
+	t.Run("successful message is marked and committed", func(t *testing.T) {
+		session := &fakeConsumerGroupSession{ctx: context.Background()}
+		consumer := &Consumer{
+			config:  &config.KafkaConfig{},
+			logger:  logger.New(logger.Config{Level: "disabled"}),
+			handler: MessageHandlerFunc(func(context.Context, *messages.TaskMessage) error { return nil }),
+			closing: make(chan struct{}),
+		}
+
+		err := (&consumerGroupHandler{consumer: consumer}).ConsumeClaim(session, newClaim())
+
+		require.NoError(t, err)
+		assert.Equal(t, 1, session.marked)
+		assert.Equal(t, 1, session.committed)
+	})
+
+	t.Run("failed message does not advance offset", func(t *testing.T) {
+		handlerErr := errors.New("processing failed")
+		session := &fakeConsumerGroupSession{ctx: context.Background()}
+		consumer := &Consumer{
+			config:  &config.KafkaConfig{},
+			logger:  logger.New(logger.Config{Level: "disabled"}),
+			handler: MessageHandlerFunc(func(context.Context, *messages.TaskMessage) error { return handlerErr }),
+			closing: make(chan struct{}),
+		}
+
+		err := (&consumerGroupHandler{consumer: consumer}).ConsumeClaim(session, newClaim())
+
+		assert.ErrorIs(t, err, handlerErr)
+		assert.Zero(t, session.marked)
+		assert.Zero(t, session.committed)
+	})
 }
 
 func TestBatchConsumer_HandleMessage(t *testing.T) {

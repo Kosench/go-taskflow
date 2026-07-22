@@ -67,16 +67,21 @@ func (s *taskService) CreateTask(ctx context.Context, req CreateTaskRequest) (*d
 		return nil, fmt.Errorf("failed to save task: %w", err)
 	}
 
-	// Publish to Kafka
-	if err := s.producer.PublishTask(ctx, task); err != nil {
-		// Log error but don't fail - worker will pick up from DB
-		s.logger.Error().
-			Err(err).
+	// Scheduled tasks stay in PostgreSQL until a scheduler publishes them.
+	shouldPublish := task.ScheduledAt == nil || !task.ScheduledAt.After(time.Now())
+	if shouldPublish {
+		if err := s.producer.PublishTask(ctx, task); err != nil {
+			// Log error but don't fail - worker will pick up from DB
+			s.logger.Error().
+				Err(err).
+				Str("task_id", task.ID).
+				Msg("failed to publish task to Kafka")
+		}
+	} else {
+		s.logger.Info().
 			Str("task_id", task.ID).
-			Msg("failed to publish task to Kafka")
-
-		// Update task status to indicate Kafka publish failed
-		// Worker will still process it from DB polling
+			Time("scheduled_at", *task.ScheduledAt).
+			Msg("scheduled task persisted for later publication")
 	}
 
 	s.logger.Info().
@@ -253,29 +258,6 @@ func (s *taskService) RetryTask(ctx context.Context, taskID string) error {
 	if err := s.repo.UpdateForRetry(ctx, task); err != nil {
 		return fmt.Errorf("failed to update task for retry: %w", err)
 	}
-
-	if err := s.producer.PublishRetry(ctx, task); err != nil {
-		s.logger.Error().
-			Err(err).
-			Str("task_id", taskID).
-			Msg("failed to publish retry to Kafka")
-
-		// Критическая ошибка - откатить изменения в БД
-		task.Status = domain.TaskStatusFailed
-		if rollbackErr := s.repo.Update(ctx, task); rollbackErr != nil {
-			s.logger.Error().
-				Err(rollbackErr).
-				Str("task_id", taskID).
-				Msg("failed to rollback task status")
-		}
-		return fmt.Errorf("failed to publish retry: %w", err)
-	}
-
-	s.logger.Info().
-		Str("task_id", taskID).
-		Int("retry_attempt", task.Retries).
-		Time("scheduled_at", nextRetry).
-		Msg("task scheduled for retry")
 
 	s.logger.Info().
 		Str("task_id", taskID).

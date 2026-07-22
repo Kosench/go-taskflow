@@ -26,9 +26,17 @@ type Producer struct {
 	messagesErrors int64
 	mu             sync.RWMutex
 
-	//Shutdown
-	closing chan struct{}
-	closed  chan struct{}
+	// Shutdown
+	closed chan struct{}
+	wg     sync.WaitGroup
+}
+
+type deliveryResult struct {
+	err error
+}
+
+type deliveryMetadata struct {
+	result chan deliveryResult
 }
 
 func NewProducer(cfg *config.KafkaConfig, log *logger.Logger) (*Producer, error) {
@@ -43,11 +51,11 @@ func NewProducer(cfg *config.KafkaConfig, log *logger.Logger) (*Producer, error)
 		producer: producer,
 		config:   cfg,
 		logger:   log,
-		closing:  make(chan struct{}),
 		closed:   make(chan struct{}),
 	}
 
 	// Start monitoring goroutines
+	p.wg.Add(2)
 	go p.handleSuccesses()
 	go p.handleErrors()
 
@@ -66,18 +74,43 @@ func (p *Producer) SendTask(ctx context.Context, task *domain.Task) error {
 		return fmt.Errorf("failed to prepare message: %w", err)
 	}
 
+	if err := p.SendMessage(ctx, msg); err != nil {
+		return err
+	}
+
+	p.logger.Debug().
+		Str("task_id", task.ID).
+		Str("topic", topic).
+		Str("task_type", string(task.Type)).
+		Msg("task sent to Kafka")
+	return nil
+}
+
+// SendMessage publishes a prepared message and waits for Kafka acknowledgement.
+func (p *Producer) SendMessage(ctx context.Context, msg *sarama.ProducerMessage) error {
+	result := make(chan deliveryResult, 1)
+	msg.Metadata = &deliveryMetadata{result: result}
+
+	timer := time.NewTimer(5 * time.Second)
+	defer timer.Stop()
+
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
+	case <-p.closed:
+		return fmt.Errorf("Kafka producer is closed")
 	case p.producer.Input() <- msg:
-		p.logger.Debug().
-			Str("task_id", task.ID).
-			Str("topic", topic).
-			Str("task_type", string(task.Type)).
-			Msg("task sent to Kafka")
-		return nil
-	case <-time.After(5 * time.Second):
-		return fmt.Errorf("timeout sending message to Kafka")
+	}
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-p.closed:
+		return fmt.Errorf("Kafka producer was closed before acknowledgement")
+	case result := <-result:
+		return result.err
+	case <-timer.C:
+		return fmt.Errorf("timeout waiting for Kafka acknowledgement")
 	}
 }
 
@@ -93,14 +126,7 @@ func (p *Producer) SendTaskWithKey(ctx context.Context, task *domain.Task, key s
 	// Override key
 	msg.Key = sarama.StringEncoder(key)
 
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case p.producer.Input() <- msg:
-		return nil
-	case <-time.After(5 * time.Second):
-		return fmt.Errorf("timeout sending message to Kafka")
-	}
+	return p.SendMessage(ctx, msg)
 }
 
 func (p *Producer) SendBatch(ctx context.Context, tasks []*domain.Task) error {
@@ -179,40 +205,59 @@ func (p *Producer) getTopicByPriority(priority domain.Priority) string {
 }
 
 func (p *Producer) handleSuccesses() {
-	for {
-		select {
-		case msg := <-p.producer.Successes():
-			p.mu.Lock()
-			p.messagesSent++
-			p.mu.Unlock()
+	defer p.wg.Done()
 
-			p.logger.Debug().
-				Str("topic", msg.Topic).
-				Int32("partition", msg.Partition).
-				Int64("offset", msg.Offset).
-				Msg("message sent successfully")
-		case <-p.closing:
-			return
+	for msg := range p.producer.Successes() {
+		if msg == nil {
+			continue
 		}
+
+		p.mu.Lock()
+		p.messagesSent++
+		p.mu.Unlock()
+		notifyDelivery(msg, nil)
+
+		p.logger.Debug().
+			Str("topic", msg.Topic).
+			Int32("partition", msg.Partition).
+			Int64("offset", msg.Offset).
+			Msg("message sent successfully")
 	}
 }
 
 func (p *Producer) handleErrors() {
-	for {
-		select {
-		case err := <-p.producer.Errors():
-			p.mu.Lock()
-			p.messagesErrors++
-			p.mu.Unlock()
+	defer p.wg.Done()
 
-			p.logger.Error().
-				Err(err.Err).
-				Str("topic", err.Msg.Topic).
-				Msg("failed to send message")
-
-		case <-p.closing:
-			return
+	for producerErr := range p.producer.Errors() {
+		if producerErr == nil {
+			continue
 		}
+
+		p.mu.Lock()
+		p.messagesErrors++
+		p.mu.Unlock()
+		notifyDelivery(producerErr.Msg, producerErr.Err)
+
+		p.logger.Error().
+			Err(producerErr.Err).
+			Str("topic", producerErr.Msg.Topic).
+			Msg("failed to send message")
+	}
+}
+
+func notifyDelivery(msg *sarama.ProducerMessage, err error) {
+	if msg == nil {
+		return
+	}
+
+	metadata, ok := msg.Metadata.(*deliveryMetadata)
+	if !ok || metadata == nil {
+		return
+	}
+
+	select {
+	case metadata.result <- deliveryResult{err: err}:
+	default:
 	}
 }
 
@@ -229,14 +274,12 @@ func (p *Producer) GetStats() ProducerStats {
 
 // Close closes the producer
 func (p *Producer) Close() error {
-	close(p.closing)
-
-	// Close producer
-	if err := p.producer.Close(); err != nil {
+	err := p.producer.Close()
+	p.wg.Wait()
+	close(p.closed)
+	if err != nil {
 		return fmt.Errorf("failed to close producer: %w", err)
 	}
-
-	close(p.closed)
 
 	p.logger.Info().Msg("Kafka producer closed")
 	return nil
